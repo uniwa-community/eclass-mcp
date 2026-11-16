@@ -1,5 +1,7 @@
 // Command eclass-mcp is a Model Context Protocol server for Open eClass, the
-// open source learning platform used by Greek universities.
+// open source learning platform by GUnet used by Greek universities
+// (https://github.com/gunet/openeclass). The endpoints and page structures it
+// relies on were taken from the Open eClass source code, release 4.4.2.
 //
 // It speaks MCP over stdio, so any MCP client (Claude Code, Claude Desktop,
 // Cursor, VS Code, Codex, Gemini CLI, ...) can start it as a subprocess.

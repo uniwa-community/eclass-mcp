@@ -129,8 +129,9 @@ func (c *Client) resolve(target string) (*url.URL, error) {
 //
 // method is GET or POST. For GET the fields go into the query string. For POST
 // they are sent url-encoded, or as multipart when files (field name to local
-// path) are given.
-func (c *Client) Send(ctx context.Context, method, target string, fields []Field, files []Field) (*http.Response, error) {
+// path) are given. ajax marks the request as coming from JavaScript, which is
+// what makes eClass list pages answer with JSON instead of HTML.
+func (c *Client) Send(ctx context.Context, method, target string, fields, files []Field, ajax bool) (*http.Response, error) {
 	u, err := c.resolve(target)
 	if err != nil {
 		return nil, err
@@ -152,6 +153,9 @@ func (c *Client) Send(ctx context.Context, method, target string, fields []Field
 		req, err := buildRequest(ctx, method, *u, fields, files, token)
 		if err != nil {
 			return nil, err
+		}
+		if ajax {
+			req.Header.Set("X-Requested-With", "XMLHttpRequest")
 		}
 		resp, err := c.http.Do(req)
 		if err != nil {

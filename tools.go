@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,15 +29,18 @@ How to work with it:
 4. eclass_submit_form: perform an action (submit an assignment, reply in a forum, send a message, answer an exercise, enroll in a course). Read the page with the form first and send all of its fields, hidden ones included, because eClass checks a "token" field.
 5. eclass_download: save a document or attachment to disk.
 
-Pages are usually in Greek. Some lists are filled by JavaScript; the page then lists "Data endpoints" you can open with eclass_get_page, for DataTables add draw=1&start=0&length=100.
-Ask the user before submitting anything that cannot be undone, such as a final exercise submission or a deletion. Plain links can trigger actions too (links containing delete, unregister, logout), so do not open those without being asked.`
+Useful shortcuts: main/personal_calendar/icalendar.php returns every event and deadline of all courses as iCal text, and modules/announcements/myannouncements.php lists announcements from all courses.
+
+Pages are usually in Greek. Some lists (announcements, messages and others) are filled by JavaScript. The page then lists its "Data endpoints" with their HTTP method; call them with ajax=true (eclass_get_page for GET, eclass_submit_form for POST). For DataTables send draw=1, start=0, length=100.
+Ask the user before submitting anything that cannot be undone, such as a final exercise submission or a deletion. Plain links can trigger actions too (links containing delete, unregister, logout, or settings toggles such as email_un), so do not open those without being asked.`
 
 const defaultMaxChars = 40000
 
 // pageWindow is embedded in tools that return long pages.
 type pageWindow struct {
-	Offset   int `json:"offset,omitempty" jsonschema:"character offset to continue a long page from (default 0)"`
-	MaxChars int `json:"max_chars,omitempty" jsonschema:"maximum characters to return (default 40000)"`
+	AJAX     bool `json:"ajax,omitempty" jsonschema:"set to true when calling one of a page's data endpoints so eClass answers with JSON"`
+	Offset   int  `json:"offset,omitempty" jsonschema:"character offset to continue a long page from (default 0)"`
+	MaxChars int  `json:"max_chars,omitempty" jsonschema:"maximum characters to return (default 40000)"`
 }
 
 type courseInput struct {
@@ -139,7 +145,7 @@ func addTools(s *mcp.Server, c *Client, downloadDir string) {
 		Name:        "eclass_get_page",
 		Description: "Open any eClass page and get it as markdown, with absolute links, all forms and their fields, and AJAX data endpoints. JSON and XML responses are returned as is.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getPageInput) (*mcp.CallToolResult, any, error) {
-		resp, err := c.Send(ctx, http.MethodGet, in.URL, nil, nil)
+		resp, err := c.Send(ctx, http.MethodGet, in.URL, nil, nil, in.AJAX)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -159,7 +165,7 @@ func addTools(s *mcp.Server, c *Client, downloadDir string) {
 		if method == "" {
 			method = http.MethodPost
 		}
-		resp, err := c.Send(ctx, method, in.URL, in.Fields, in.Files)
+		resp, err := c.Send(ctx, method, in.URL, in.Fields, in.Files, in.AJAX)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -174,7 +180,7 @@ func addTools(s *mcp.Server, c *Client, downloadDir string) {
 		Name:        "eclass_download",
 		Description: "Download a file from eClass (document, assignment attachment, folder zip, video) into " + downloadDir + " and return the saved path.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in downloadInput) (*mcp.CallToolResult, any, error) {
-		resp, err := c.Send(ctx, http.MethodGet, in.URL, nil, nil)
+		resp, err := c.Send(ctx, http.MethodGet, in.URL, nil, nil, false)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -215,7 +221,7 @@ type xmlTool struct {
 
 // mobileXML calls a mobile API endpoint and decodes its XML answer.
 func (c *Client) mobileXML(ctx context.Context, endpoint string, fields []Field, v any) error {
-	resp, err := c.Send(ctx, http.MethodPost, endpoint, fields, nil)
+	resp, err := c.Send(ctx, http.MethodPost, endpoint, fields, nil, false)
 	if err != nil {
 		return err
 	}
@@ -250,12 +256,55 @@ func describe(resp *http.Response) (string, error) {
 	if !isText(ct) {
 		return prefix + fmt.Sprintf("This URL is a file (%s, %d bytes). Use eclass_download to save it.", ct, resp.ContentLength), nil
 	}
-	if ct == "" || strings.Contains(ct, "html") {
-		out, err := renderPage(resp.Request.URL, resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	// eClass often sends JSON with a text/html content type, so sniff it.
+	if trimmed := bytes.TrimSpace(body); len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') && json.Valid(trimmed) {
+		out, err := readableJSON(trimmed, resp.Request.URL)
 		return prefix + out, err
 	}
-	body, err := io.ReadAll(resp.Body)
-	return prefix + string(body), err
+	if ct == "" || strings.Contains(ct, "html") {
+		out, err := renderPage(resp.Request.URL, bytes.NewReader(body))
+		return prefix + out, err
+	}
+	return prefix + string(body), nil
+}
+
+// readableJSON pretty prints JSON and turns the HTML snippets that DataTables
+// endpoints put in their cells into markdown, links included.
+func readableJSON(data []byte, base *url.URL) (string, error) {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return "", err
+	}
+	var walk func(any) any
+	walk = func(v any) any {
+		switch x := v.(type) {
+		case string:
+			if strings.Contains(x, "<") {
+				if md, err := fragmentToMarkdown(base, x); err == nil {
+					return md
+				}
+			}
+		case []any:
+			for i := range x {
+				x[i] = walk(x[i])
+			}
+		case map[string]any:
+			for k := range x {
+				x[k] = walk(x[k])
+			}
+		}
+		return v
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	err := enc.Encode(walk(v))
+	return buf.String(), err
 }
 
 // window returns the requested slice of a long text plus a note on how to get

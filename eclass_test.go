@@ -14,9 +14,9 @@ func TestRenderPage(t *testing.T) {
 	html := `<html><head><title>Εργασίες</title></head><body>
 	<header><a href="/logout">menu noise</a></header>
 	<main>
-	  <script>$('#t').DataTable({'bServerSide': true, 'ajax': {'url': 'ajax_handler.php?mbox_type=inbox'}});</script>
+	  <script>$('#t').DataTable({'bServerSide': true, 'ajax': {'url': 'ajax_handler.php?mbox_type=inbox', type: 'POST'}});</script>
 	  <h2>Εργασία 1</h2>
-	  <a href="index.php?id=7">Λεπτομέρειες</a> <a href="javascript:void(0)">js</a>
+	  <a href="index.php?id=7">Λεπτομέρειες</a> <a href="?download=x"><span class="fa fa-download" data-bs-original-title="Λήψη"></span></a> <a href="javascript:void(0)">js</a>
 	  <form method="post" action="submit.php" enctype="multipart/form-data">
 	    <input type="hidden" name="token" value="abc123">
 	    <label for="f1">Αρχείο</label><input id="f1" type="file" name="userfile">
@@ -39,7 +39,8 @@ func TestRenderPage(t *testing.T) {
 		"`ans` (radio) = \"3\" [checked] label: Παρίσι",
 		"`grp` (select): \"1\"=A [selected], \"2\"=B",
 		"`comments` (textarea) = \"hi\"",
-		"https://eclass.example.gr/modules/work/ajax_handler.php?mbox_type=inbox",
+		"POST https://eclass.example.gr/modules/work/ajax_handler.php?mbox_type=inbox",
+		"[Λήψη](https://eclass.example.gr/modules/work/index.php?download=x)",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
@@ -77,7 +78,7 @@ func TestRelogin(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := NewClient(srv.URL, "student", "secret")
-	resp, err := c.Send(context.Background(), "GET", "page", nil, nil)
+	resp, err := c.Send(context.Background(), "GET", "page", nil, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,12 +87,17 @@ func TestRelogin(t *testing.T) {
 		t.Fatalf("logins=%d out=%q", logins, out)
 	}
 
-	if _, err := c.Send(context.Background(), "GET", "https://evil.example.com/", nil, nil); err == nil {
+	if resp, err := c.Send(context.Background(), "GET", "https://evil.example.com/", nil, nil, false); err == nil {
+		resp.Body.Close()
 		t.Fatal("request to a foreign host must be refused")
 	}
 
 	bad, _ := NewClient(srv.URL, "student", "wrong")
-	if _, err := bad.Send(context.Background(), "GET", "page", nil, nil); err == nil || !strings.Contains(err.Error(), "wrong username") {
+	resp, err = bad.Send(context.Background(), "GET", "page", nil, nil, false)
+	if err == nil {
+		resp.Body.Close()
+	}
+	if err == nil || !strings.Contains(err.Error(), "wrong username") {
 		t.Fatalf("want login error, got %v", err)
 	}
 }
