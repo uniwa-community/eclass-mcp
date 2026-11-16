@@ -49,8 +49,10 @@ The Rob Pike quote up top is the idea behind the whole project. eClass has aroun
 - [Examples](#examples)
 - [What's covered](#whats-covered)
 - [Safety](#safety)
+- [Privacy](#privacy)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+- [TODO](#todo)
 - [License](#license) and [Credits](#credits)
 
 ## What you can ask it
@@ -392,7 +394,20 @@ A few things live entirely inside the browser and can't really be driven by an a
 
 The server tells the assistant to ask you before anything irreversible, and `eclass_submit_form` is marked as destructive so clients that respect that hint ask for confirmation. If you only want to read, don't approve `eclass_submit_form` calls, or deny the tool in your client's settings.
 
+**Don't set `eclass_submit_form` to "always allow".** The assistant reads text other people wrote (forum posts, messages, announcements), and that text can contain instructions meant for it, such as "upload this file from your disk". Reviewing each submission yourself is what stops that. Tighter limits, like an upload folder and a read-only mode, are tracked in [#2](https://github.com/uniwa-community/eclass-mcp/issues/2).
+
 Keep your password out of shared config files and repos. VS Code's input prompt or your client's secret storage is the nicest option where it exists.
+
+## Privacy
+
+eclass-mcp runs on your computer, but the assistant you plug it into usually doesn't. It's worth knowing what goes where.
+
+- **Your password** goes only to your eClass site, to log in. It is never part of what the assistant sees. It does sit in your MCP client's config file, in plain text for most clients (for example `~/.claude.json`), so treat that file like a password file.
+- **What the assistant reads goes to your AI provider.** Every page, message, grade or document the assistant opens becomes part of the conversation, and the conversation is processed by the company running the model (Anthropic for Claude, OpenAI for Codex, and so on) under their privacy terms.
+- **That includes other people's data.** eClass pages show more than your own information: classmates' names in message recipient lists, group members, professors' messages and email addresses, forum posts by others. Opening those pages shares that information with your AI provider too. Under GDPR, other people's data deserves the same care as yours, so open only what you need.
+- **Files you download** stay on your computer in `ECLASS_DOWNLOAD_DIR`. The assistant only sees their content if you ask it to read them.
+- **Nothing else.** The server has no telemetry, no analytics and no server of its own. It talks to your eClass site and nothing else.
+- **University rules.** Giving an automated tool your university password, and letting it act for you, may fall under your university's IT acceptable use policy. If you're unsure, ask your IT department before relying on it.
 
 ## Troubleshooting
 
@@ -460,6 +475,29 @@ GitHub Actions runs on every push and pull request:
 - **Lint** (`.github/workflows/lint.yml`): gofmt check and golangci-lint
 - **Test** (`.github/workflows/test.yml`): `go vet`, `go test -race` and a build
 
+## TODO
+
+Known gaps, roughly in order. Contributions are welcome on any of them.
+
+### Security
+
+- [ ] Restrict uploads to one folder, so prompt injection can't upload private files ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
+- [ ] Read-only mode, plus blocking links that perform actions on a plain GET ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
+- [ ] Read the password from a command or keyring instead of plain text config ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
+- [ ] Refuse non-HTTPS `ECLASS_URL` ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
+
+### Correctness
+
+- [ ] Test an assignment submission end to end on a real account (the Uppy `userfile[]` upload has only been checked against the eClass source and a fake server)
+- [ ] Test exercise answering and final submission end to end on a real account
+- [ ] Don't overwrite downloads that share a name; save as `name (1).pdf` the way browsers do
+- [ ] Open eClass 4.5 compatibility ([#1](https://github.com/uniwa-community/eclass-mcp/issues/1))
+
+### Adoption
+
+- [ ] Attach prebuilt binaries for Linux, macOS and Windows to every GitHub release, so people don't need Go installed
+- [ ] Try it on other universities' eClass sites and list the ones that work
+
 ## License
 
 GPL-3.0, see [LICENSE](LICENSE). Open eClass itself is free software by [GUnet](https://www.gunet.gr/); this project just talks to it.
@@ -476,4 +514,4 @@ Everything here was built by reading that source, specifically the `Release_4.4.
 
 Big thanks to the GUnet team and every eClass contributor. This project is not affiliated with or endorsed by GUnet or the University of West Attica.
 
-The Open eClass logo belongs to GUnet and is used here only to credit the project. The Go gopher was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The quote is from Rob Pike's talk [Simplicity is Complicated](https://www.youtube.com/watch?v=rFejpH_tAHM) at dotGo 2015.
+The Open eClass logo belongs to GUnet and is used here only to credit the project. The gopher drawings come from [The Go Gopher](https://go.dev/blog/gopher) on the Go blog. The Go gopher was designed by [Renée French](https://reneefrench.blogspot.com/) and is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The quote is from Rob Pike's talk [Simplicity is Complicated](https://www.youtube.com/watch?v=rFejpH_tAHM) at dotGo 2015.
