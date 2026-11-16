@@ -1,0 +1,19 @@
+#!/bin/sh
+# Formats the Go files you are about to commit and stages the result.
+# Enable once per clone with: git config core.hooksPath .githooks
+set -e
+
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
+[ -z "$files" ] && exit 0
+
+if command -v golangci-lint >/dev/null 2>&1; then
+	# Uses the formatters from .golangci.yml (gofmt and goimports).
+	golangci-lint fmt $files
+else
+	echo "pre-commit: golangci-lint not found, falling back to gofmt" >&2
+	gofmt -w $files
+fi
+
+# Re-stage so the commit contains the formatted code. Note this also stages
+# any unstaged edits in the same files.
+git add $files

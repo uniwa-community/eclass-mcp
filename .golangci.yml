@@ -1,0 +1,23 @@
+# golangci-lint v2 configuration. Run with: golangci-lint run
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+    - bodyclose
+  exclusions:
+    presets:
+      # Unchecked Close/Flush/print errors are idiomatic Go.
+      - std-error-handling
+    rules:
+      # Fake HTTP handlers in tests don't need to check every Write.
+      - path: _test\.go
+        linters: [errcheck]
+        text: "w.Write|io.WriteString"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
