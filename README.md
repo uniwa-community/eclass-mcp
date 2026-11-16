@@ -130,11 +130,71 @@ There are five, on purpose. eClass has around forty modules and every university
 |---|---|
 | `eclass_my_courses` | Your name, every course you're enrolled in (with its course code) and your personal tools: messages, calendar, announcements from all courses, notes, profile, usage stats. |
 | `eclass_course_tools` | Every module enabled in one course, with the link to open it. The list comes from your eClass, so it always matches what you see in the browser. |
-| `eclass_get_page` | Opens any eClass page and turns it into clean markdown. Links come out absolute, every form is listed with all its fields and current values, and lists that load through JavaScript get their data URLs listed so the assistant can fetch the JSON. Long pages come in chunks. |
-| `eclass_submit_form` | Fills in and sends a form, including file uploads. That's how assignments get submitted, forum replies posted, messages sent, quizzes answered and so on. |
+| `eclass_get_page` | Opens any eClass page and turns it into clean markdown. Links come out absolute, icon buttons get their tooltip as text, and every form is listed with all its fields and current values. Lists that load through JavaScript (announcements, messages) get their data URLs listed, and calling those with `ajax: true` returns the rows as readable JSON. Long pages come in chunks. |
+| `eclass_submit_form` | Fills in and sends a form, including file uploads. That's how assignments get submitted, forum replies posted, messages sent, quizzes answered and so on. It also handles the upload fields that eClass adds with JavaScript, like the assignment uploader. |
 | `eclass_download` | Saves a file (a PDF from Documents, an assignment attachment, a zipped folder) to your download folder. |
 
 The server also hands the assistant a short guide on connect, so it knows to start from your course list, follow links, and send hidden form fields like eClass's CSRF `token`.
+
+## Examples
+
+These are based on real runs against eclass.uniwa.gr, trimmed a little, with personal details changed or left out.
+
+**"Do I have any assignments due soon?"**
+
+The assistant calls `eclass_my_courses`, then opens the assignments page of each course with `eclass_get_page`. You get something like:
+
+> You have one open assignment:
+>
+> - **Data Mining**, "Εργασία 2026-2027", individual, due Sunday 13 December 2026 at 18:00 (26 days left). Not submitted yet. The brief is attached as `DM_PPS_2026_2027.rar`, want me to download it?
+
+**"Grab the slides for the latest Data Mining unit."**
+
+It opens the course's Documents page, sees the newest folder (`05_ΚΑΝΟΝΕΣ ΣΥΣΧΕΤΙΣΗΣ`, added 26/10) and calls `eclass_download` on the folder's download link:
+
+> Saved the whole folder as a zip to ~/Downloads/eclass/05_ΚΑΝΟΝΕΣ ΣΥΣΧΕΤΙΣΗΣ.zip.
+
+**"What did my teachers announce this month?"**
+
+It opens "my announcements", or a course's announcements page, and pulls the rows from the page's data endpoint:
+
+> Data Mining posted three announcements: new unit material on Association Rules (26/10, slides and code are in Documents), the Classification unit (25/10), and extra material (25/10).
+
+**"Any new messages in my eClass inbox?"**
+
+The inbox loads through JavaScript, so the assistant calls its data endpoint with `ajax: true` and then opens the message you care about:
+
+> You have 3 unread messages. The newest is from your Software Quality teacher about the exam schedule, and one from a lab instructor has a PDF attached. Want me to open them or download the attachment?
+
+**"Put all my eClass deadlines in my calendar."**
+
+It fetches `main/personal_calendar/icalendar.php`, which gives every event and deadline across your courses as iCal, and can save it as an `.ics` file you import anywhere.
+
+**"Submit ~/projects/dm/report.pdf to the Data Mining assignment with the comment 'Final version'."**
+
+It opens the assignment page, finds the upload form and the `userfile[]` upload field, shows you what it is about to send and asks first. Then it calls:
+
+```json
+{
+  "url": "https://eclass.uniwa.gr/modules/work/index.php?course=ICE251",
+  "fields": [
+    {"name": "id", "value": "54933"},
+    {"name": "stud_comments", "value": "Final version"},
+    {"name": "work_submit", "value": "true"}
+  ],
+  "files": [{"name": "userfile[]", "value": "/home/you/projects/dm/report.pdf"}]
+}
+```
+
+and reads the confirmation page back to you.
+
+**Other things worth trying**
+
+- "Which of my courses have a forum, and what are the newest threads?"
+- "Show my grades in every course that has a gradebook."
+- "Find the Operating Systems course in the catalogue and enroll me."
+- "Reply to my last message from the Networks lab saying I'll be there on Thursday."
+- "Summarise everything that changed in my courses since last week."
 
 ## What's covered
 
@@ -178,8 +238,9 @@ The code is small:
 - `main.go` reads the config and starts the stdio server
 - `client.go` does login, session renewal, requests and uploads
 - `page.go` turns HTML into markdown and lists forms and data endpoints
-- `tools.go` defines the five tools
+- `tools.go` defines the five tools and turns responses into text
 - `eclass_test.go` covers page rendering and the login retry logic
+- `tools_test.go` runs every tool through a real MCP client against a fake eClass
 
 ## Troubleshooting
 
@@ -193,10 +254,40 @@ The code is small:
 
 ## Development
 
+You need Go 1.26+ and [golangci-lint](https://golangci-lint.run/) v2:
+
 ```sh
-go test ./...
-go vet ./...
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 ```
+
+Run the checks:
+
+```sh
+go test -race ./...
+golangci-lint run ./...
+```
+
+### Git hooks
+
+The repo ships two hooks in `.githooks/`. Git doesn't turn them on by itself, so after cloning run this once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+From then on:
+
+- **pre-commit** formats the Go files you're committing (gofmt and goimports through `golangci-lint fmt`, or plain gofmt if golangci-lint isn't installed) and stages the result. Heads up: if a file has both staged and unstaged changes, both end up in the commit.
+- **pre-push** runs `golangci-lint run` and `go test -race`, and stops the push if either fails.
+
+To skip them for a one-off (a WIP push to your own branch, say) add `--no-verify`. To turn them off again run `git config --unset core.hooksPath`.
+
+### CI
+
+GitHub Actions runs on every push and pull request:
+
+- **Lint** (`.github/workflows/lint.yml`): gofmt check and golangci-lint
+- **Test** (`.github/workflows/test.yml`): `go vet`, `go test -race` and a build
 
 To poke at it by hand, the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is handy:
 
@@ -207,3 +298,15 @@ npx @modelcontextprotocol/inspector -e ECLASS_USERNAME=you -e ECLASS_PASSWORD=se
 ## License
 
 GPL-3.0, see [LICENSE](LICENSE). Open eClass itself is free software by [GUnet](https://www.gunet.gr/), this project just talks to it.
+
+## Credits
+
+This project exists because [Open eClass](https://www.openeclass.org/) is open source. It is developed by [GUnet](https://www.gunet.gr/) (the Greek Universities Network) and the source lives at [github.com/gunet/openeclass](https://github.com/gunet/openeclass).
+
+Everything here was built by reading that source, specifically the `Release_4.4.2` tag that eclass.uniwa.gr runs:
+
+- `modules/mobile/` (`mlogin.php`, `mportfolio.php`, `mtools.php`, `minit.php`) for login, the course list and the per course tool list
+- `modules/message/`, `modules/announcements/` and `modules/work/` for how the DataTables lists and the Uppy upload widget talk to the server
+- `include/init.php` and the Blade layouts for how "mobile" sessions are rendered
+
+Big thanks to the GUnet team and every eClass contributor. This project is not affiliated with or endorsed by GUnet or the University of West Attica.
