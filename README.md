@@ -19,7 +19,7 @@ It was built for [eclass.uniwa.gr](https://eclass.uniwa.gr) (University of West 
 You need Go 1.26 or newer.
 
 ```sh
-go install github.com/marios-pz/eclass-mcp@latest
+go install github.com/uniwa-community/eclass-mcp@latest
 ```
 
 That drops an `eclass-mcp` binary in `$(go env GOPATH)/bin` (usually `~/go/bin`). Make sure it is on your `PATH`, or use the full path in the configs below.
@@ -27,7 +27,7 @@ That drops an `eclass-mcp` binary in `$(go env GOPATH)/bin` (usually `~/go/bin`)
 Building from a clone works too:
 
 ```sh
-git clone https://github.com/marios-pz/eclass-mcp
+git clone https://github.com/uniwa-community/eclass-mcp
 cd eclass-mcp
 go build -o eclass-mcp .
 ```
@@ -203,3 +203,7 @@ To poke at it by hand, the [MCP Inspector](https://github.com/modelcontextprotoc
 ```sh
 npx @modelcontextprotocol/inspector -e ECLASS_USERNAME=you -e ECLASS_PASSWORD=secret eclass-mcp
 ```
+
+## License
+
+GPL-3.0, see [LICENSE](LICENSE). Open eClass itself is free software by [GUnet](https://www.gunet.gr/), this project just talks to it.

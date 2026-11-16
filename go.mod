@@ -1,4 +1,4 @@
-module github.com/marios-pz/eclass-mcp
+module github.com/uniwa-community/eclass-mcp
 
 go 1.26.0
 
