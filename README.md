@@ -52,7 +52,6 @@ The Rob Pike quote up top is the idea behind the whole project. eClass has aroun
 - [Privacy](#privacy)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
-- [TODO](#todo)
 - [License](#license) and [Credits](#credits)
 
 ## What you can ask it
@@ -474,29 +473,6 @@ GitHub Actions runs on every push and pull request:
 
 - **Lint** (`.github/workflows/lint.yml`): gofmt check and golangci-lint
 - **Test** (`.github/workflows/test.yml`): `go vet`, `go test -race` and a build
-
-## TODO
-
-Known gaps, roughly in order. Contributions are welcome on any of them.
-
-### Security
-
-- [ ] Restrict uploads to one folder, so prompt injection can't upload private files ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
-- [ ] Read-only mode, plus blocking links that perform actions on a plain GET ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
-- [ ] Read the password from a command or keyring instead of plain text config ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
-- [ ] Refuse non-HTTPS `ECLASS_URL` ([#2](https://github.com/uniwa-community/eclass-mcp/issues/2))
-
-### Correctness
-
-- [ ] Test an assignment submission end to end on a real account (the Uppy `userfile[]` upload has only been checked against the eClass source and a fake server)
-- [ ] Test exercise answering and final submission end to end on a real account
-- [ ] Don't overwrite downloads that share a name; save as `name (1).pdf` the way browsers do
-- [ ] Open eClass 4.5 compatibility ([#1](https://github.com/uniwa-community/eclass-mcp/issues/1))
-
-### Adoption
-
-- [ ] Attach prebuilt binaries for Linux, macOS and Windows to every GitHub release, so people don't need Go installed
-- [ ] Try it on other universities' eClass sites and list the ones that work
 
 ## License
 
