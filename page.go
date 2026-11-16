@@ -91,6 +91,22 @@ func renderPage(pageURL *url.URL, body io.Reader) (string, error) {
 		writeForm(&out, i+1, f, pageURL, abs)
 	})
 
+	// Some pages, like the course catalogue, keep their inputs outside any
+	// form and let JavaScript post them; list those too.
+	orphans := root.Find("input, select, textarea").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Closest("form").Length() == 0
+	})
+	if orphans.Length() > 0 {
+		out.WriteString("\n## Fields outside any form\n\nJavaScript on this page sends these itself.\n\n")
+		writeFields(&out, orphans)
+	}
+
+	// eClass uses one CSRF token per session. It often only appears in the
+	// header forms, which are cut above, but JavaScript endpoints need it too.
+	if tok := doc.Find("input[name=token]").First().AttrOr("value", ""); tok != "" {
+		fmt.Fprintf(&out, "\nCSRF token for this session: `%s`. Send it as `token` with any POST, including to data endpoints.\n", tok)
+	}
+
 	for _, name := range uploads {
 		fmt.Fprintf(&out, "\nFile upload field added by JavaScript: `%s`. Send it with eclass_submit_form files, together with the fields of the form above.\n", name)
 	}
@@ -119,8 +135,13 @@ func writeForm(out *strings.Builder, n int, f *goquery.Selection, pageURL *url.U
 		out.WriteString(" (accepts file uploads)")
 	}
 	out.WriteString("\n\n")
+	writeFields(out, f.Find("input, select, textarea, button"))
+}
 
-	f.Find("input, select, textarea, button").Each(func(_ int, in *goquery.Selection) {
+// writeFields prints one line per named field with its type, current value
+// and label.
+func writeFields(out *strings.Builder, fields *goquery.Selection) {
+	fields.Each(func(_ int, in *goquery.Selection) {
 		name, ok := in.Attr("name")
 		if !ok || name == "" {
 			return

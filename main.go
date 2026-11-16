@@ -20,14 +20,20 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// version is overridden at build time with -ldflags "-X main.version=v1.2.3".
+// version can be set at build time with -ldflags "-X main.version=v1.2.3".
+// Otherwise it comes from the module version go install recorded.
 var version = "dev"
 
 func main() {
+	if bi, ok := debug.ReadBuildInfo(); ok && version == "dev" && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		version = bi.Main.Version
+	}
+
 	if len(os.Args) > 1 && (os.Args[1] == "-v" || os.Args[1] == "--version" || os.Args[1] == "version") {
 		fmt.Println("eclass-mcp", version)
 		return

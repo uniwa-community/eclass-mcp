@@ -12,7 +12,7 @@ import (
 func TestRenderPage(t *testing.T) {
 	page, _ := url.Parse("https://eclass.example.gr/modules/work/index.php?course=CS101")
 	html := `<html><head><title>Εργασίες</title></head><body>
-	<header><a href="/logout">menu noise</a></header>
+	<header><a href="/logout">menu noise</a><form action="/search"><input type="hidden" name="token" value="sess-tok"></form></header>
 	<main>
 	  <script>$('#t').DataTable({'bServerSide': true, 'ajax': {'url': 'ajax_handler.php?mbox_type=inbox', type: 'POST'}});</script>
 	  <h2>Εργασία 1</h2>
@@ -24,6 +24,7 @@ func TestRenderPage(t *testing.T) {
 	    <select name="grp"><option value="1" selected>A</option><option value="2">B</option></select>
 	    <textarea name="comments">hi</textarea>
 	  </form>
+	  <label aria-label="Εγγραφή"><input type="checkbox" name="selectCourse[]" value="8455"></label>
 	</main></body></html>`
 
 	out, err := renderPage(page, strings.NewReader(html))
@@ -40,6 +41,9 @@ func TestRenderPage(t *testing.T) {
 		"`grp` (select): \"1\"=A [selected], \"2\"=B",
 		"`comments` (textarea) = \"hi\"",
 		"POST https://eclass.example.gr/modules/work/ajax_handler.php?mbox_type=inbox",
+		"## Fields outside any form",
+		"`selectCourse[]` (checkbox) = \"8455\"",
+		"CSRF token for this session: `sess-tok`",
 		"[Λήψη](https://eclass.example.gr/modules/work/index.php?download=x)",
 	} {
 		if !strings.Contains(out, want) {

@@ -33,6 +33,10 @@ How to work with it:
 Useful shortcuts: main/personal_calendar/icalendar.php returns every event and deadline of all courses as iCal text, and modules/announcements/myannouncements.php lists announcements from all courses.
 
 Pages are usually in Greek. Some lists (announcements, messages and others) are filled by JavaScript. The page then lists its "Data endpoints" with their HTTP method; call them with ajax=true (eclass_get_page for GET, eclass_submit_form for POST). For DataTables send draw=1, start=0, length=100.
+eClass uses a single CSRF token per session: pages show it as "CSRF token for this session", and any POST (forms or data endpoints) must include it as token.
+
+Enrolling and unregistering: the course catalogue (modules/auth/courses.php) uses JavaScript that posts to modules/auth/course_submit.php with cid=<numeric course id>, state=true to enroll or state=false to unregister, token=<CSRF token>, plus password=<course password> if the course has one. Send it with ajax=true. It answers registered, unregistered, unauthorized or prereqsnotcomplete. Unregistering may be impossible to undo (closed courses do not accept new students), so always warn the user and ask before unregistering.
+
 Ask the user before submitting anything that cannot be undone, such as a final exercise submission or a deletion. Plain links can trigger actions too (links containing delete, unregister, logout, or settings toggles such as email_un), so do not open those without being asked.`
 
 const defaultMaxChars = 40000
