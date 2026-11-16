@@ -89,7 +89,7 @@ Five tools sit on top of a small HTTP client that knows how to log in to eClass,
 
 ```mermaid
 flowchart TB
-    subgraph client["MCP client (Claude Code, Desktop, Cursor, ...)"]
+    subgraph client["MCP client"]
         llm["Language model"]
     end
 
