@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,7 +24,7 @@ import (
 const instructions = `This server gives you the logged in user's Open eClass account.
 
 How to work with it:
-1. eclass_my_courses: the user's name, enrolled courses (with course codes) and personal tools (messages, calendar, announcements from all courses, notes, profile, stats).
+1. eclass_my_courses: the user's name, enrolled courses (with course codes and, for student enrollments, the numeric course id some pages such as main/unregcours.php?cid= need) and personal tools (messages, calendar, announcements from all courses, notes, profile, stats).
 2. eclass_course_tools: every module enabled in one course (announcements, documents, assignments, exercises, forum, gradebook and so on) with its URL.
 3. eclass_get_page: open any eClass URL. You get markdown with absolute links, every form with its fields, and any AJAX data endpoints. Follow links to go deeper.
 4. eclass_submit_form: perform an action (submit an assignment, reply in a forum, send a message, answer an exercise, enroll in a course). Read the page with the form first and send all of its fields, hidden ones included, because eClass checks a "token" field.
@@ -93,12 +94,18 @@ func addTools(s *mcp.Server, c *Client, downloadDir string) {
 			return nil, nil, err
 		}
 
+		ids := c.courseIDs(ctx)
+
 		var b strings.Builder
 		fmt.Fprintf(&b, "User: %s %s\n", p.User.Given, p.User.Surname)
 		for _, g := range p.Groups {
 			fmt.Fprintf(&b, "\n## %s\n\n", g.Name)
 			for _, co := range g.Courses {
-				fmt.Fprintf(&b, "- %s (course code `%s`, public code %s), %s\n", co.Title, co.Code, co.PublicCode, co.Teacher)
+				id := ""
+				if ids[co.Code] != "" {
+					id = ", course id " + ids[co.Code]
+				}
+				fmt.Fprintf(&b, "- %s (course code `%s`%s, public code %s), %s\n", co.Title, co.Code, id, co.PublicCode, co.Teacher)
 			}
 		}
 		b.WriteString("\n## Personal tools\n\n")
@@ -217,6 +224,40 @@ type xmlTool struct {
 	Name     string `xml:"name,attr"`
 	Redirect string `xml:"redirect,attr"`
 	Active   string `xml:"active,attr"`
+}
+
+// courseLinkOrID matches, in page order, either a link into a course
+// ("courses/CODE/") or the numeric id in an unregister link ("cid=123").
+var courseLinkOrID = regexp.MustCompile(`courses/([^/'"\s]+)/|unregcours\.php\?[^'"]*?cid=(\d+)`)
+
+// courseIDs maps course codes to eClass's numeric course ids. A few pages
+// (unregistering from a course, for one) want the id instead of the code,
+// and the mobile API never exposes it. main/my_courses.php does: every course
+// card links to courses/CODE/ and is followed by its unregister form with
+// cid=ID, so pairing each id with the course link before it is enough.
+// This is best effort; on any error the list simply comes without ids.
+func (c *Client) courseIDs(ctx context.Context) map[string]string {
+	ids := map[string]string{}
+	resp, err := c.Send(ctx, http.MethodGet, "main/my_courses.php", nil, nil, false)
+	if err != nil {
+		return ids
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ids
+	}
+	last := ""
+	for _, m := range courseLinkOrID.FindAllStringSubmatch(string(body), -1) {
+		switch {
+		case m[1] != "":
+			last = m[1]
+		case last != "":
+			ids[last] = m[2]
+			last = ""
+		}
+	}
+	return ids
 }
 
 // mobileXML calls a mobile API endpoint and decodes its XML answer.

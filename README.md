@@ -291,7 +291,7 @@ There are five, on purpose. Every university turns on a different mix of eClass 
 
 | Tool | What it does |
 |---|---|
-| 🎓 `eclass_my_courses` | Your name, every course you're enrolled in (with its course code) and your personal tools: messages, calendar, announcements from all courses, notes, profile, usage stats. |
+| 🎓 `eclass_my_courses` | Your name, every course you're enrolled in (with its course code, plus the numeric course id that a few pages like unregistering need) and your personal tools: messages, calendar, announcements from all courses, notes, profile, usage stats. |
 | 🧰 `eclass_course_tools` | Every module enabled in one course, with the link to open it. The list comes from your eClass, so it always matches what you see in the browser. |
 | 📄 `eclass_get_page` | Opens any eClass page and turns it into clean markdown. Links come out absolute, icon buttons get their tooltip as text, and every form is listed with all its fields and current values. Lists that load through JavaScript get their data URLs listed, and calling those with `ajax: true` returns the rows as readable JSON. Long pages come in chunks. |
 | 📝 `eclass_submit_form` | Fills in and sends a form, including file uploads. That's how assignments get submitted, forum replies posted, messages sent, quizzes answered and so on. |

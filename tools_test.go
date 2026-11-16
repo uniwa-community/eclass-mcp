@@ -38,6 +38,15 @@ func fakeEClass(t *testing.T) *httptest.Server {
   <profiletools><tool name="Τα μηνύματά μου" redirect="https://x/modules/message/index.php?view=mobile" type="mymessages" active="true"/></profiletools>
   <user givenname="ΓΙΑΝΝΗΣ" surname="ΦΟΙΤΗΤΗΣ"/>
 </portfolio>`)
+		case "/main/my_courses.php":
+			// Same shape as main/my_courses.php upstream: course card, then
+			// its unregister modal. The theme logo must not confuse pairing.
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			io.WriteString(w, `<link rel="icon" href="/courses/theme_data/47/logo.png">
+<a class='TextBold my-2' href='https://x/courses/ICE251/'>ΕΞΟΡΥΞΗ</a>
+<img src='https://x/courses/ICE251/image/a.png'>
+<form method='post' action='/main/unregcours.php?u=9&amp;cid=3251'></form>
+<a class='TextBold my-2' href='https://x/courses/TEACH1/'>Taught course, no unregister form</a>`)
 		case "/modules/mobile/mtools.php":
 			if r.FormValue("course") != "ICE251" {
 				io.WriteString(w, "FAILED")
@@ -105,7 +114,7 @@ func TestTools(t *testing.T) {
 	}{
 		{"eclass_my_courses", nil, []string{
 			"User: ΓΙΑΝΝΗΣ ΦΟΙΤΗΤΗΣ",
-			"ΕΞΟΡΥΞΗ ΔΕΔΟΜΕΝΩΝ (course code `ICE251`, public code ICE1-7106), Α. Καθηγητής",
+			"ΕΞΟΡΥΞΗ ΔΕΔΟΜΕΝΩΝ (course code `ICE251`, course id 3251, public code ICE1-7106), Α. Καθηγητής",
 			"Τα μηνύματά μου: https://x/modules/message/index.php\n",
 			"Εγγραφή σε μάθημα: https://x/modules/auth/courses.php\n",
 		}, false},
